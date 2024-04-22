@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Podcast Dial Testing</title>
+  <style>
+    .container {
+      max-width: 600px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+    #rating {
+      width: 100px;
+      height: 100px;
+      border-radius: 50%;
+      border: 2px solid #333;
+      margin: 20px auto;
+      position: relative;
+      cursor: pointer;
+    }
+    #rating:after {
+      content: attr(data-rating);
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-size: 24px;
+    }
+    #chart {
+      border: 1px solid #333;
+      width: 100%;
+      height: 300px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <audio id="audio" controls>
+      <source src="msmsam_ep0_EDITv0.0.0.mp3" type="audio/mpeg">
+      Your browser does not support the audio element.
+    </audio>
+    <p>While audio is playing, click and drag the dial, or hover over it and scroll:</p>
+    <div id="rating" data-rating="0" min="0" max="100" contenteditable="true"></div>
+    <button id="clearButton">Clear Graph</button>
+    <canvas id="chart"></canvas>
+  </div>
+
+  <script>
+    const audio = document.getElementById('audio');
+    const ratingDiv = document.getElementById('rating');
+    const clearButton = document.getElementById('clearButton');
+    const ctx = document.getElementById('chart').getContext('2d');
+
+    const ratings = [];
+
+    audio.addEventListener('timeupdate', () => {
+      const currentTime = audio.currentTime;
+      const duration = audio.duration;
+      ratings.push({ timestamp: currentTime, rating: parseInt(ratingDiv.dataset.rating) });
+      drawChart(duration);
+    });
+
+    ratingDiv.addEventListener('input', (e) => {
+      ratingDiv.dataset.rating = parseInt(e.target.innerText);
+    });
+
+    ratingDiv.addEventListener('wheel', (e) => {
+      e.preventDefault();
+      let currentValue = parseInt(ratingDiv.dataset.rating);
+      currentValue += e.deltaY > 0 ? -1 : 1;
+      currentValue = Math.min(100, Math.max(0, currentValue));
+      ratingDiv.dataset.rating = currentValue;
+      updateRating();
+    });
+
+    let mouseDown = false;
+
+    ratingDiv.addEventListener('mousedown', (e) => {
+      e.preventDefault();
+      mouseDown = true;
+      updateRatingWithMouse(e.clientY);
+    });
+
+    document.addEventListener('mousemove', (e) => {
+      if (mouseDown) {
+        updateRatingWithMouse(e.clientY);
+      }
+    });
+
+    document.addEventListener('mouseup', () => {
+      mouseDown = false;
+    });
+
+    function updateRatingWithMouse(clientY) {
+      const rect = ratingDiv.getBoundingClientRect();
+      const offsetY = clientY - rect.top;
+      const percent = 1 - offsetY / rect.height;
+      const newValue = Math.round(percent * 100);
+      ratingDiv.dataset.rating = Math.min(100, Math.max(0, newValue));
+      updateRating();
+    }
+
+    clearButton.addEventListener('click', () => {
+      ratings.length = 0;
+      drawChart(audio.duration);
+    });
+
+    function updateRating() {
+      ratingDiv.innerText = ratingDiv.dataset.rating;
+    }
+
+    function drawChart(duration) {
+      ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+      ctx.beginPath();
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = 'blue';
+
+      const interval = duration / 10;
+
+      ratings.forEach((rating) => {
+        const x = ctx.canvas.width * (rating.timestamp / duration);
+        const y = ctx.canvas.height - (ctx.canvas.height * rating.rating / 100);
+        ctx.lineTo(x, y);
+      });
+
+      ctx.stroke();
+
+      // Draw timestamps
+      ctx.font = '12px Arial';
+      ctx.fillStyle = 'black';
+      let lastDrawnTime = -1;
+      ratings.forEach((rating) => {
+        const x = ctx.canvas.width * (rating.timestamp / duration);
+        const y = ctx.canvas.height - 10;
+        const minutes = Math.floor(rating.timestamp / 60);
+        const seconds = Math.floor(rating.timestamp % 60);
+        const timeString = `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
+        if (rating.timestamp - lastDrawnTime >= interval) {
+          ctx.fillText(timeString, x, y);
+          lastDrawnTime = rating.timestamp;
+        }
+      });
+    }
+  </script>
+</body>
+</html>
